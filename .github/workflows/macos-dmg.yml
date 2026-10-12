@@ -46,6 +46,37 @@ jobs:
             "UNIFLOW_SUPABASE_KEY=$UNIFLOW_SUPABASE_KEY" \
             build
 
+      - name: Widget-Extension prüfen und beide Bundles ad-hoc signieren
+        run: |
+          set -euo pipefail
+          APP="$RUNNER_TEMP/DerivedData/Build/Products/Release/UniFlow Widgets.app"
+          EXT="$APP/Contents/PlugIns/UniFlowWidgetExtension.appex"
+
+          # Validate the widget is really embedded and advertises WidgetKit.
+          test -d "$APP"
+          test -d "$EXT"
+          test -f "$APP/Contents/Info.plist"
+          test -f "$EXT/Contents/Info.plist"
+          plutil -lint "$APP/Contents/Info.plist" "$EXT/Contents/Info.plist"
+          EXTENSION_POINT=$(/usr/libexec/PlistBuddy -c "Print :NSExtension:NSExtensionPointIdentifier" "$EXT/Contents/Info.plist")
+          test "$EXTENSION_POINT" = "com.apple.widgetkit-extension"
+          test -d "$EXT/Contents/MacOS"
+
+          # Nested code MUST be signed before the containing app.
+          # "-" is an ad-hoc test identity, NOT a Developer ID certificate.
+          codesign --force --sign - --timestamp=none \
+            --entitlements Widgets/WidgetExtension.entitlements "$EXT"
+          codesign --force --sign - --timestamp=none \
+            --entitlements UniFlowWidgetsApp/UniFlowWidgets.entitlements "$APP"
+
+          # Fail CI if either the widget extension or enclosing app is not
+          # internally valid. No --deep on signing; --deep verifies nesting.
+          codesign --verify --strict --verbose=2 "$EXT"
+          codesign --verify --deep --strict --verbose=2 "$APP"
+          echo "App and widget extension both pass codesign verification."
+          codesign -dv --verbose=2 "$EXT" 2>&1
+          codesign -dv --verbose=2 "$APP" 2>&1
+
       - name: Installations-DMG erstellen
         run: |
           set -euo pipefail
@@ -54,16 +85,17 @@ jobs:
           STAGING="$RUNNER_TEMP/UniFlow-Widgets-Installer"
           mkdir -p "$STAGING"
           ditto "$APP" "$STAGING/UniFlow Widgets.app"
+          codesign --verify --deep --strict --verbose=2 "$STAGING/UniFlow Widgets.app"
           ln -s /Applications "$STAGING/Applications"
           hdiutil create \
             -volname 'UniFlow Widgets' \
             -srcfolder "$STAGING" \
             -ov -format UDZO \
-            -o "$RUNNER_TEMP/UniFlow-Widgets-unsigned.dmg"
+            -o "$RUNNER_TEMP/UniFlow-Widgets-adhoc.dmg"
 
       - name: DMG zum Herunterladen bereitstellen
         uses: actions/upload-artifact@v4
         with:
-          name: UniFlow-Widgets-unsigned-DMG
+          name: UniFlow-Widgets-adhoc-DMG
           path: ${{ runner.temp }}/UniFlow-Widgets-unsigned.dmg
           if-no-files-found: error
