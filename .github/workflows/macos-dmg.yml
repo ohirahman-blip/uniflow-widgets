@@ -1,0 +1,69 @@
+name: Build UniFlow Widgets DMG
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: macOS Widget Build
+    runs-on: macos-15
+    timeout-minutes: 30
+
+    steps:
+      - name: Repository auschecken
+        uses: actions/checkout@v4
+
+      - name: Xcode-Version anzeigen
+        run: xcodebuild -version
+
+      - name: XcodeGen installieren
+        run: brew install xcodegen
+
+      - name: Swift-Kalenderlogik testen
+        run: bash scripts/check-engine.sh
+
+      - name: Xcode-Projekt erzeugen
+        run: xcodegen generate
+
+      - name: App und Widget-Erweiterung bauen (unsigniert)
+        env:
+          UNIFLOW_SUPABASE_URL: ${{ secrets.UNIFLOW_SUPABASE_URL }}
+          UNIFLOW_SUPABASE_KEY: ${{ secrets.UNIFLOW_SUPABASE_KEY }}
+        run: |
+          xcodebuild \
+            -project UniFlowWidgets.xcodeproj \
+            -scheme UniFlowWidgets \
+            -configuration Release \
+            -destination 'platform=macOS' \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            CODE_SIGNING_ALLOWED=NO \
+            "UNIFLOW_SUPABASE_URL=$UNIFLOW_SUPABASE_URL" \
+            "UNIFLOW_SUPABASE_KEY=$UNIFLOW_SUPABASE_KEY" \
+            build
+
+      - name: Installations-DMG erstellen
+        run: |
+          set -euo pipefail
+          APP="$RUNNER_TEMP/DerivedData/Build/Products/Release/UniFlow Widgets.app"
+          test -d "$APP"
+          STAGING="$RUNNER_TEMP/UniFlow-Widgets-Installer"
+          mkdir -p "$STAGING"
+          ditto "$APP" "$STAGING/UniFlow Widgets.app"
+          ln -s /Applications "$STAGING/Applications"
+          hdiutil create \
+            -volname 'UniFlow Widgets' \
+            -srcfolder "$STAGING" \
+            -ov -format UDZO \
+            -o "$RUNNER_TEMP/UniFlow-Widgets-unsigned.dmg"
+
+      - name: DMG zum Herunterladen bereitstellen
+        uses: actions/upload-artifact@v4
+        with:
+          name: UniFlow-Widgets-unsigned-DMG
+          path: ${{ runner.temp }}/UniFlow-Widgets-unsigned.dmg
+          if-no-files-found: error
