@@ -97,5 +97,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: UniFlow-Widgets-adhoc-DMG
-          path: ${{ runner.temp }}/UniFlow-Widgets-unsigned.dmg
+          path: ${{ runner.temp }}/UniFlow-Widgets-adhoc.dmg
           if-no-files-found: error
