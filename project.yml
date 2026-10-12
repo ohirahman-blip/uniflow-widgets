@@ -1,0 +1,47 @@
+name: UniFlowWidgets
+options:
+  bundleIdPrefix: com.uniflow
+  minimumXcodeGenVersion: 2.38.0
+settings:
+  base:
+    MACOSX_DEPLOYMENT_TARGET: '14.0'
+    SWIFT_VERSION: '5.9'
+    CODE_SIGN_STYLE: Automatic
+    GENERATE_INFOPLIST_FILE: NO
+    UNIFLOW_SUPABASE_URL: ''
+    UNIFLOW_SUPABASE_KEY: ''
+
+targets:
+  UniFlowWidgets:
+    type: application
+    platform: macOS
+    sources:
+      - path: UniFlowWidgetsApp
+        excludes:
+          - Info.plist
+          - '*.entitlements'
+      - Shared
+    settings:
+      base:
+        PRODUCT_NAME: 'UniFlow Widgets'
+        PRODUCT_BUNDLE_IDENTIFIER: com.uniflow.widgets
+        INFOPLIST_FILE: UniFlowWidgetsApp/Info.plist
+        CODE_SIGN_ENTITLEMENTS: UniFlowWidgetsApp/UniFlowWidgets.entitlements
+    dependencies:
+      - target: UniFlowWidgetExtension
+        embed: true
+  UniFlowWidgetExtension:
+    type: app-extension
+    platform: macOS
+    sources:
+      - path: Widgets
+        excludes:
+          - Info.plist
+          - '*.entitlements'
+      - Shared
+    settings:
+      base:
+        PRODUCT_NAME: UniFlowWidgetExtension
+        PRODUCT_BUNDLE_IDENTIFIER: com.uniflow.widgets.extension
+        INFOPLIST_FILE: Widgets/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Widgets/WidgetExtension.entitlements
